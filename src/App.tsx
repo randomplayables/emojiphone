@@ -1,234 +1,294 @@
-// import { useState } from 'react'
-// import reactLogo from './assets/react.svg'
-// import viteLogo from '/vite.svg'
-// import './App.css'
+import { useState, useEffect, useCallback } from 'react';
+import './App.css';
+import EmojiCircle from './components/EmojiCircle';
+import { cosineSimilarity, TEmbedding } from './types';
+import { generateMockEmbeddings, gamePhrases } from './utils/mockEmbeddings';
+import { subsampleEmbedding } from './utils/embeddings';
 
-// function App() {
-//   const [count, setCount] = useState(0)
+// Game config
+const NUM_EMOJIS = 6;
+const SUBSAMPLE_SIZE = 50; // Size of each emoji's vocabulary
+const EMBEDDING_SIZE = 100; // Number of words in the full embedding
+const VECTOR_DIMENSION = 20; // Dimension of each embedding vector
 
-//   return (
-//     <>
-//       <div>
-//         <a href="https://vite.dev" target="_blank">
-//           <img src={viteLogo} className="logo" alt="Vite logo" />
-//         </a>
-//         <a href="https://react.dev" target="_blank">
-//           <img src={reactLogo} className="logo react" alt="React logo" />
-//         </a>
-//       </div>
-//       <h1>Vite + React</h1>
-//       <div className="card">
-//         <button onClick={() => setCount((count) => count + 1)}>
-//           count is {count}
-//         </button>
-//         <p>
-//           Edit <code>src/App.tsx</code> and save to test HMR
-//         </p>
-//       </div>
-//       <p className="read-the-docs">
-//         Click on the Vite and React logos to learn more
-//       </p>
-//     </>
-//   )
-// }
-
-// export default App
-
-// import React, { useState, useEffect } from 'react'
-// import { fullEmbedding, subsampleEmbedding } from './utils/embeddings'
-// import { cosineSimilarity } from './types'
-// import EmojiCircle from './components/EmojiCircle'
-
-// const NUM_EMOJIS = 6
-// const SUBSAMPLE_SIZE = 100 // adjust for difficulty
-
-// const randomPhrases = [
-//   'hello world',
-//   'react is fun',
-//   'emojiphone game',
-//   // ... more phrases
-// ]
-
-// function App() {
-//   const [phrase, setPhrase] = useState<string>('')
-//   const [displayedPhrase, setDisplayedPhrase] = useState<string>('')
-//   const [embeddings, setEmbeddings] = useState<TEmbedding[]>([])
-//   const [round, setRound] = useState(0)
-//   const [score, setScore] = useState<number[]>([])
-
-//   useEffect(() => {
-//     // Pre-generate subsamples for each emoji in the circle
-//     const subs = Array.from({ length: NUM_EMOJIS }).map(() =>
-//       subsampleEmbedding(fullEmbedding, SUBSAMPLE_SIZE)
-//     )
-//     setEmbeddings(subs)
-//   }, [])
-
-//   const startRound = () => {
-//     const p = randomPhrases[Math.floor(Math.random() * randomPhrases.length)]
-//     setPhrase(p)
-//     let current = p.split(' ')
-//     embeddings.forEach(sub => {
-//       current = current.map(word => {
-//         const vec = fullEmbedding[word] || [0]
-//         // find closest word in sub
-//         let best = word
-//         let bestSim = -1
-//         for (const [w, v] of Object.entries(sub)) {
-//           const sim = cosineSimilarity(vec, v)
-//           if (sim > bestSim) {
-//             bestSim = sim
-//             best = w
-//           }
-//         }
-//         return best
-//       })
-//     })
-//     setDisplayedPhrase(current.join(' '))
-//     setRound(r => r + 1)
-//   }
-
-//   const handleGuess = (guess: string) => {
-//     if (guess === phrase) {
-//       // compute distance in full embedding
-//       const dist = phrase
-//         .split(' ')
-//         .reduce((sum, w, i) => {
-//           const v1 = fullEmbedding[w] || [0]
-//           const v2 = fullEmbedding[displayedPhrase.split(' ')[i]] || [0]
-//           return sum + (1 - cosineSimilarity(v1, v2))
-//         }, 0)
-//       setScore(prev => [...prev, dist])
-//     } else {
-//       alert('Wrong! Game Over')
-//     }
-//   }
-
-//   return (
-//     <div className="p-4 max-w-xl mx-auto">
-//       <h1 className="text-2xl font-bold">Emojiphone</h1>
-//       <button onClick={startRound} className="mt-4 px-3 py-1 bg-blue-500 text-white rounded">
-//         Start Round
-//       </button>
-
-//       {round > 0 && (
-//         <div className="mt-4">
-//           <p>Secret: {displayedPhrase}</p>
-//           <input
-//             type="text"
-//             placeholder="Your guess"
-//             onKeyDown={e => {
-//               if (e.key === 'Enter') handleGuess((e.target as HTMLInputElement).value)
-//             }}
-//             className="border p-1 w-full"
-//           />
-//           <p className="mt-2">Score: {score.reduce((a, b) => a + b, 0).toFixed(2)}</p>
-//         </div>
-//       )}
-//     </div>
-//   )
-// }
-
-// export default App
-
-// import React, { useState, useEffect } from 'react'
-import { useState, useEffect } from 'react'
-import { fullEmbedding, subsampleEmbedding } from './utils/embeddings'
-import { cosineSimilarity } from './types'
-import EmojiCircle from './components/EmojiCircle'
-
-const NUM_EMOJIS = 6
-const SUBSAMPLE_SIZE = 100 // adjust for difficulty
-
-const randomPhrases = [
-  'hello world',
-  'react is fun',
-  'emojiphone game',
-  // ... more phrases
-]
+// Emoji set
+const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯'];
 
 function App() {
-  const [phrase, setPhrase] = useState<string>('')
-  const [displayedPhrase, setDisplayedPhrase] = useState<string>('')
-  const [embeddings, setEmbeddings] = useState<any[]>([])
-  const [round, setRound] = useState(0)
-  const [score, setScore] = useState<number[]>([])
+  // Game state
+  const [fullEmbedding, setFullEmbedding] = useState<TEmbedding>({});
+  const [subsamples, setSubsamples] = useState<TEmbedding[]>([]);
+  const [originalPhrase, setOriginalPhrase] = useState<string>('');
+  const [finalPhrase, setFinalPhrase] = useState<string>('');
+  const [transformedPhrases, setTransformedPhrases] = useState<string[]>([]);
+  const [gamePhase, setGamePhase] = useState<'idle' | 'animating' | 'guessing' | 'gameOver'>('idle');
+  const [score, setScore] = useState<number>(0);
+  const [rounds, setRounds] = useState<number>(0);
+  const [userGuess, setUserGuess] = useState<string>('');
+  const [activeEmojiIndex, setActiveEmojiIndex] = useState<number>(0);
+  const [isAnimating, setIsAnimating] = useState<boolean>(false);
 
+  // Initialize game data
   useEffect(() => {
-    // Pre-generate subsamples for each emoji in the circle
-    const subs = Array.from({ length: NUM_EMOJIS }).map(() =>
+    // Generate mock embeddings on component mount
+    const embeds = generateMockEmbeddings(EMBEDDING_SIZE, VECTOR_DIMENSION);
+    setFullEmbedding(embeds);
+  }, []);
+
+  // Generate subsamples whenever the full embedding changes
+  useEffect(() => {
+    if (Object.keys(fullEmbedding).length === 0) return;
+    
+    // Generate a subsample for each emoji
+    const samples = Array.from({ length: NUM_EMOJIS }).map(() => 
       subsampleEmbedding(fullEmbedding, SUBSAMPLE_SIZE)
-    )
-    setEmbeddings(subs)
-  }, [])
+    );
+    setSubsamples(samples);
+  }, [fullEmbedding]);
 
-  const startRound = () => {
-    const p = randomPhrases[Math.floor(Math.random() * randomPhrases.length)]
-    setPhrase(p)
-    let current = p.split(' ')
-    embeddings.forEach(sub => {
-      current = current.map(word => {
-        const vec = fullEmbedding[word] || new Array(Object.values(fullEmbedding)[0].length).fill(0)
-        // find closest word in sub
-        let best = word
-        let bestSim = -Infinity
-        Object.entries(sub).forEach(([w, v]) => {
-          const sim = cosineSimilarity(vec, v as number[])
-          if (sim > bestSim) {
-            bestSim = sim
-            best = w
+  // Function to pass phrase through emoji subsamples
+  const passPhraseThroughEmojis = useCallback((phrase: string) => {
+    if (subsamples.length === 0) return { transformedPhrases: [], finalPhrase: phrase };
+    
+    let currentPhrase = phrase;
+    const allPhrases: string[] = [];
+    
+    // Pass through each emoji's subsample
+    subsamples.forEach(subsample => {
+      const words = currentPhrase.split(' ');
+      const transformedWords = words.map(word => {
+        // Skip transformation for words not in our full embedding
+        if (!fullEmbedding[word.toLowerCase()]) return word;
+        
+        const originalVector = fullEmbedding[word.toLowerCase()];
+        
+        // Find closest word in the subsample
+        let bestWord = word;
+        let bestSimilarity = -Infinity;
+        
+        Object.entries(subsample).forEach(([candidateWord, candidateVector]) => {
+          const similarity = cosineSimilarity(originalVector, candidateVector);
+          if (similarity > bestSimilarity) {
+            bestSimilarity = similarity;
+            bestWord = candidateWord;
           }
-        })
-        return best
-      })
-    })
-    setDisplayedPhrase(current.join(' '))
-    setRound(r => r + 1)
-  }
+        });
+        
+        return bestWord;
+      });
+      
+      currentPhrase = transformedWords.join(' ');
+      allPhrases.push(currentPhrase);
+    });
+    
+    return { transformedPhrases: allPhrases, finalPhrase: currentPhrase };
+  }, [fullEmbedding, subsamples]);
 
-  const handleGuess = (guess: string) => {
-    if (guess === phrase) {
-      const dist = phrase.split(' ').reduce((sum, w, i) => {
-        const original = fullEmbedding[w] || new Array(Object.values(fullEmbedding)[0].length).fill(0)
-        const transformed = fullEmbedding[displayedPhrase.split(' ')[i]] || new Array(Object.values(fullEmbedding)[0].length).fill(0)
-        return sum + (1 - cosineSimilarity(original, transformed))
-      }, 0)
-      setScore(prev => [...prev, dist])
-    } else {
-      alert('Wrong! Game Over')
-      // TODO: trigger game-over state and reset
+  // Start a new round
+  const startNewRound = useCallback(() => {
+    if (Object.keys(fullEmbedding).length === 0 || subsamples.length === 0) {
+      return; // Game not ready yet
     }
-  }
+    
+    // Select a random phrase
+    const phrase = gamePhrases[Math.floor(Math.random() * gamePhrases.length)];
+    setOriginalPhrase(phrase);
+    
+    // Process phrase through emoji subsamples
+    const { transformedPhrases, finalPhrase } = passPhraseThroughEmojis(phrase);
+    
+    setTransformedPhrases(transformedPhrases);
+    setFinalPhrase(finalPhrase);
+    setGamePhase('animating');
+    setIsAnimating(true);
+    setActiveEmojiIndex(0);
+    setUserGuess('');
+    
+    // After animation completes, move to guessing phase
+    setTimeout(() => {
+      setIsAnimating(false);
+      setGamePhase('guessing');
+    }, (NUM_EMOJIS + 1) * 1000); // Animation time plus a buffer
+  }, [fullEmbedding, subsamples, passPhraseThroughEmojis]);
+
+  // Calculate score based on semantic distance
+  const calculateScore = useCallback(() => {
+    if (!originalPhrase || !finalPhrase) return 0;
+    
+    const originalWords = originalPhrase.split(' ');
+    const finalWords = finalPhrase.split(' ');
+    
+    // Calculate total semantic distance
+    let totalDistance = 0;
+    const maxLength = Math.max(originalWords.length, finalWords.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      if (i >= originalWords.length || i >= finalWords.length) {
+        // Penalize different lengths
+        totalDistance += 1;
+        continue;
+      }
+      
+      const origWord = originalWords[i].toLowerCase();
+      const finalWord = finalWords[i].toLowerCase();
+      
+      if (origWord === finalWord) {
+        // No distance for identical words
+        continue;
+      }
+      
+      // If we have embeddings for both words, compute cosine distance
+      if (fullEmbedding[origWord] && fullEmbedding[finalWord]) {
+        const similarity = cosineSimilarity(fullEmbedding[origWord], fullEmbedding[finalWord]);
+        totalDistance += (1 - similarity); // Convert similarity to distance
+      } else {
+        // Default penalty for unknown words
+        totalDistance += 1;
+      }
+    }
+    
+    // Scale score - higher is better, so we invert the distance
+    // and scale by number of words for fairness
+    return Math.max(0, 10 - (totalDistance * 2)) * originalWords.length;
+  }, [originalPhrase, finalPhrase, fullEmbedding]);
+
+  // Handle user's guess
+  const submitGuess = useCallback(() => {
+    if (gamePhase !== 'guessing') return;
+    
+    // Check if guess matches the original phrase (case-insensitive)
+    if (userGuess.toLowerCase() === originalPhrase.toLowerCase()) {
+      // Correct guess - award points
+      const roundScore = calculateScore();
+      setScore(prevScore => prevScore + roundScore);
+      setRounds(prevRounds => prevRounds + 1);
+      
+      // Show result briefly before starting next round
+      setGamePhase('idle');
+      setTimeout(startNewRound, 2000);
+    } else {
+      // Incorrect guess - game over
+      setGamePhase('gameOver');
+    }
+  }, [gamePhase, userGuess, originalPhrase, calculateScore, startNewRound]);
+
+  // Restart the game after game over
+  const restartGame = () => {
+    setScore(0);
+    setRounds(0);
+    setGamePhase('idle');
+    // Generate new embeddings for variety
+    setFullEmbedding(generateMockEmbeddings(EMBEDDING_SIZE, VECTOR_DIMENSION));
+  };
 
   return (
-    <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold">Emojiphone</h1>
-      <button
-        onClick={startRound}
-        disabled={embeddings.length === 0}
-        className="mt-4 px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50"
-      >
-        Start Round
-      </button>
-
-      {round > 0 && (
-        <div className="mt-4 space-y-2">
-          <p><strong>Secret:</strong> {displayedPhrase}</p>
-          <input
-            type="text"
-            placeholder="Your guess"
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleGuess((e.target as HTMLInputElement).value)
-            }}
-            className="border p-1 w-full"
-          />
-          <p><strong>Score:</strong> {score.reduce((a, b) => a + b, 0).toFixed(2)}</p>
+    <div className="max-w-2xl mx-auto p-4">
+      <h1 className="text-3xl font-bold text-center mb-4">Emojiphone</h1>
+      <p className="text-center mb-6">
+        The telephone game, but with emoji-based vector transformations!
+      </p>
+      
+      {/* Game instructions */}
+      {gamePhase === 'idle' && Object.keys(fullEmbedding).length > 0 && (
+        <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg mb-6">
+          <h2 className="text-xl font-semibold mb-2">How to Play:</h2>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>A phrase will travel through a circle of emojis</li>
+            <li>Each emoji transforms the phrase using vector embeddings</li>
+            <li>You'll see the final transformed phrase</li>
+            <li>Your goal: Guess what the original phrase was</li>
+            <li>Score points for correct guesses based on transformation distance</li>
+          </ol>
+          <button 
+            onClick={startNewRound}
+            className="w-full mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Start Game
+          </button>
         </div>
       )}
-
-      <EmojiCircle />
+      
+      {/* Game loading indicator */}
+      {gamePhase === 'idle' && Object.keys(fullEmbedding).length === 0 && (
+        <div className="text-center py-8">
+          <p>Loading game data...</p>
+        </div>
+      )}
+      
+      {/* Game board */}
+      {gamePhase !== 'idle' && (
+        <div className="space-y-4">
+          {/* Score display */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-lg font-bold">
+              Score: {score.toFixed(1)}
+            </div>
+            <div>
+              Round: {rounds + 1}
+            </div>
+          </div>
+          
+          {/* Emoji circle */}
+          <EmojiCircle 
+            emojis={EMOJIS}
+            activeIndex={activeEmojiIndex}
+            transformedPhrases={transformedPhrases}
+            isAnimating={isAnimating}
+          />
+          
+          {/* Final phrase (shown after animation) */}
+          {gamePhase === 'guessing' && (
+            <div className="mt-6 space-y-4">
+              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                <p className="text-center text-lg font-semibold">Final Phrase:</p>
+                <p className="text-center text-xl">{finalPhrase}</p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">
+                  Guess the original phrase:
+                </label>
+                <input
+                  type="text"
+                  value={userGuess}
+                  onChange={(e) => setUserGuess(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitGuess()}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  placeholder="Type your guess here..."
+                  autoFocus
+                />
+                <button
+                  onClick={submitGuess}
+                  className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  Submit Guess
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Game over screen */}
+          {gamePhase === 'gameOver' && (
+            <div className="mt-6 p-4 bg-red-100 dark:bg-red-900 rounded-lg text-center">
+              <h2 className="text-2xl font-bold mb-2">Game Over!</h2>
+              <p className="mb-4">
+                The original phrase was: <strong>{originalPhrase}</strong>
+              </p>
+              <p className="mb-4">
+                Final Score: <strong>{score.toFixed(1)}</strong> points in {rounds} rounds
+              </p>
+              <button
+                onClick={restartGame}
+                className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Play Again
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
