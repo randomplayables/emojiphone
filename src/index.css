@@ -211,3 +211,7 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.bg-white {
+  background-color: #ffffff;
+}
