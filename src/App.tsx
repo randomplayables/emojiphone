@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import EmojiCircle from './components/EmojiCircle';
 import { cosineSimilarity, TEmbedding } from './types';
-import { generateMockEmbeddings, gamePhrases } from './utils/mockEmbeddings';
+import { fetchEmbeddings } from './utils/openaiEmbeddings';
+import { gamePhrases } from './data/gamePhrases';
 import { subsampleEmbedding } from './utils/embeddings';
 
 // Game config
 const NUM_EMOJIS = 6;
 const SUBSAMPLE_SIZE = 50; // Size of each emoji's vocabulary
-const EMBEDDING_SIZE = 100; // Number of words in the full embedding
-const VECTOR_DIMENSION = 20; // Dimension of each embedding vector
 
 // Emoji set
 const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯'];
@@ -28,11 +27,16 @@ function App() {
   const [activeEmojiIndex, setActiveEmojiIndex] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
 
-  // Initialize game data
+ // Fetch real embeddings for our phrase vocabulary on mount
   useEffect(() => {
-    // Generate mock embeddings on component mount
-    const embeds = generateMockEmbeddings(EMBEDDING_SIZE, VECTOR_DIMENSION);
-    setFullEmbedding(embeds);
+    const load = async () => {
+      const vocab = Array.from(
+        new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
+      );
+      const embeds = await fetchEmbeddings(vocab);
+      setFullEmbedding(embeds);
+    };
+    load();
   }, []);
 
   // Generate subsamples whenever the full embedding changes
@@ -178,12 +182,18 @@ function App() {
 
   // Restart the game after game over
   const restartGame = () => {
-    setScore(0);
-    setRounds(0);
-    setGamePhase('idle');
-    // Generate new embeddings for variety
-    setFullEmbedding(generateMockEmbeddings(EMBEDDING_SIZE, VECTOR_DIMENSION));
-  };
+        setScore(0);
+        setRounds(0);
+        setGamePhase('idle');
+        // Refetch embeddings for a fresh run
+        (async () => {
+          const vocab = Array.from(
+            new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
+          );
+          const embeds = await fetchEmbeddings(vocab);
+          setFullEmbedding(embeds);
+        })();
+      };
 
   return (
     <div className="max-w-2xl mx-auto p-4">

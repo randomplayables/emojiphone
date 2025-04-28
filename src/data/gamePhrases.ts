@@ -1,0 +1,22 @@
+export const gamePhrases = [
+    "To be, or not to be: that is the question",
+    "All that glitters is not gold",
+    "The only thing we have to fear is fear itself",
+    "I think, therefore I am",
+    "The unexamined life is not worth living",
+    "Two roads diverged in a yellow wood",
+    "Hope is the thing with feathers",
+    "Not all those who wander are lost",
+    "The only constant is change",
+    "To err is human; to forgive, divine",
+    "The truth will set you free",
+    "A rose by any other name would smell as sweet",
+    "Et tu, Brute?",
+    "That's one small step for man, one giant leap for mankind",
+    "Knowledge is power",
+    "The course of true love never did run smooth",
+    "All the world's a stage",
+    "Brevity is the soul of wit",
+    "Ask not what your country can do for you",
+    "I have a dream"
+  ];
