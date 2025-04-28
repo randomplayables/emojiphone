@@ -52,22 +52,15 @@ const EmojiCircle = ({ emojis, activeIndex, transformedPhrases, isAnimating }: E
             }}
           >
             {emoji}
-            {isHighlighted && transformedPhrases[i] && (
+            {isHighlighted && (
               <div className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 px-2 py-1 rounded-md shadow-md text-sm w-max max-w-40 z-10">
-                {transformedPhrases[i]}
+                {/* Only show text on the last emoji; earlier steps render a blank box */}
+                {i === emojis.length - 1 ? transformedPhrases[i] : ''}
               </div>
             )}
           </div>
         );
       })}
-      
-      {/* Center text showing current phrase */}
-      {isAnimating && animationStep > 0 && animationStep <= emojis.length && (
-        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-20 text-center">
-          <p className="text-lg font-bold">Current phrase:</p>
-          <p className="text-md">{transformedPhrases[animationStep - 1]}</p>
-        </div>
-      )}
     </div>
   );
 };

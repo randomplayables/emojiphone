@@ -96,6 +96,10 @@ function App() {
     
     // Process phrase through emoji subsamples
     const { transformedPhrases, finalPhrase } = passPhraseThroughEmojis(phrase);
+
+    // Development logs: original and intermediate phrases
+    console.log('Original phrase:', phrase);
+    console.log('Transformed phrases:', transformedPhrases);
     
     setTransformedPhrases(transformedPhrases);
     setFinalPhrase(finalPhrase);
