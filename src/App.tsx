@@ -13,6 +13,9 @@ const SUBSAMPLE_SIZE = 50; // Size of each emoji's vocabulary
 // Emoji set
 const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯'];
 
+// Game phases
+type GamePhase = 'idle' | 'animating' | 'guessing' | 'gameOver' | 'practice';
+
 function App() {
   // Game state
   const [fullEmbedding, setFullEmbedding] = useState<TEmbedding>({});
@@ -20,14 +23,17 @@ function App() {
   const [originalPhrase, setOriginalPhrase] = useState<string>('');
   const [finalPhrase, setFinalPhrase] = useState<string>('');
   const [transformedPhrases, setTransformedPhrases] = useState<string[]>([]);
-  const [gamePhase, setGamePhase] = useState<'idle' | 'animating' | 'guessing' | 'gameOver'>('idle');
+  const [gamePhase, setGamePhase] = useState<GamePhase>('idle');
   const [score, setScore] = useState<number>(0);
   const [rounds, setRounds] = useState<number>(0);
   const [userGuess, setUserGuess] = useState<string>('');
   const [activeEmojiIndex, setActiveEmojiIndex] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
+  
+  // New state for practice mode
+  const [practicePhrase, setPracticePhrase] = useState<string>('');
 
- // Fetch real embeddings for our phrase vocabulary on mount
+  // Fetch real embeddings for our phrase vocabulary on mount
   useEffect(() => {
     const load = async () => {
       const vocab = Array.from(
@@ -88,7 +94,7 @@ function App() {
     return { transformedPhrases: allPhrases, finalPhrase: currentPhrase };
   }, [fullEmbedding, subsamples]);
 
-  // Start a new round
+  // Start a new regular game round
   const startNewRound = useCallback(() => {
     if (Object.keys(fullEmbedding).length === 0 || subsamples.length === 0) {
       return; // Game not ready yet
@@ -118,6 +124,33 @@ function App() {
       setGamePhase('guessing');
     }, (NUM_EMOJIS + 1) * 1000); // Animation time plus a buffer
   }, [fullEmbedding, subsamples, passPhraseThroughEmojis]);
+
+  // New function to handle the "Send It" practice mode
+  const startPracticeMode = useCallback(() => {
+    if (Object.keys(fullEmbedding).length === 0 || subsamples.length === 0 || !practicePhrase.trim()) {
+      return; // Not ready or no phrase entered
+    }
+    
+    // Process the user's phrase through emoji subsamples
+    const { transformedPhrases, finalPhrase } = passPhraseThroughEmojis(practicePhrase);
+    
+    console.log('Practice phrase:', practicePhrase);
+    console.log('Transformed practice phrases:', transformedPhrases);
+    
+    setOriginalPhrase(practicePhrase);
+    setTransformedPhrases(transformedPhrases);
+    setFinalPhrase(finalPhrase);
+    setGamePhase('practice');
+    setIsAnimating(true);
+    setActiveEmojiIndex(0);
+    
+    // After animation completes, stop animating but stay in practice mode
+    setTimeout(() => {
+      setIsAnimating(false);
+      // Show all emojis as active to display their transformations
+      setActiveEmojiIndex(NUM_EMOJIS - 1);
+    }, (NUM_EMOJIS + 1) * 1000); // Animation time plus a buffer
+  }, [fullEmbedding, subsamples, practicePhrase, passPhraseThroughEmojis]);
 
   // Calculate score based on semantic distance
   const calculateScore = useCallback(() => {
@@ -182,18 +215,24 @@ function App() {
 
   // Restart the game after game over
   const restartGame = () => {
-        setScore(0);
-        setRounds(0);
-        setGamePhase('idle');
-        // Refetch embeddings for a fresh run
-        (async () => {
-          const vocab = Array.from(
-            new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
-          );
-          const embeds = await fetchEmbeddings(vocab);
-          setFullEmbedding(embeds);
-        })();
-      };
+    setScore(0);
+    setRounds(0);
+    setGamePhase('idle');
+    // Refetch embeddings for a fresh run
+    (async () => {
+      const vocab = Array.from(
+        new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
+      );
+      const embeds = await fetchEmbeddings(vocab);
+      setFullEmbedding(embeds);
+    })();
+  };
+
+  // Return to the main menu from practice mode
+  const returnToMenu = () => {
+    setGamePhase('idle');
+    setPracticePhrase('');
+  };
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -202,23 +241,55 @@ function App() {
         The telephone game, but with emoji-based vector transformations!
       </p>
       
-      {/* Game instructions */}
+      {/* Game instructions and menu */}
       {gamePhase === 'idle' && Object.keys(fullEmbedding).length > 0 && (
-        <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg mb-6">
-          <h2 className="text-xl font-semibold mb-2">How to Play:</h2>
-          <ol className="list-decimal list-inside space-y-1">
-            <li>A phrase will travel through a circle of emojis</li>
-            <li>Each emoji transforms the phrase using vector embeddings</li>
-            <li>You'll see the final transformed phrase</li>
-            <li>Your goal: Guess what the original phrase was</li>
-            <li>Score points for correct guesses based on transformation distance</li>
-          </ol>
-          <button 
-            onClick={startNewRound}
-            className="w-full mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Start Game
-          </button>
+        <div className="space-y-6">
+          {/* Game mode */}
+          <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
+            <h2 className="text-xl font-semibold mb-2">Play Game:</h2>
+            <ol className="list-decimal list-inside space-y-1 mb-4">
+              <li>A phrase will travel through a circle of emojis</li>
+              <li>Each emoji transforms the phrase using vector embeddings</li>
+              <li>You'll see the final transformed phrase</li>
+              <li>Your goal: Guess what the original phrase was</li>
+              <li>Score points for correct guesses based on transformation distance</li>
+            </ol>
+            <button 
+              onClick={startNewRound}
+              className="w-full mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Start Game
+            </button>
+          </div>
+          
+          {/* Practice mode - "Send It" */}
+          <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
+            <h2 className="text-xl font-semibold mb-2">Practice: "Send It"</h2>
+            <p className="mb-4">
+              Enter your own phrase and see how it transforms through each emoji!
+            </p>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={practicePhrase}
+                onChange={(e) => setPracticePhrase(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && startPracticeMode()}
+                className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                placeholder="Enter a phrase to transform..."
+              />
+              <button
+                onClick={startPracticeMode}
+                disabled={!practicePhrase.trim()}
+                className={`w-full py-2 rounded-lg transition-colors ${
+                  practicePhrase.trim() 
+                    ? 'bg-green-500 text-white hover:bg-green-600' 
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Send It!
+              </button>
+            </div>
+          </div>
         </div>
       )}
       
@@ -232,15 +303,30 @@ function App() {
       {/* Game board */}
       {gamePhase !== 'idle' && (
         <div className="space-y-4">
-          {/* Score display */}
-          <div className="flex justify-between items-center mb-4">
-            <div className="text-lg font-bold">
-              Score: {score.toFixed(1)}
+          {/* Score display (only shown in regular game mode, not practice) */}
+          {gamePhase !== 'practice' && (
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-lg font-bold">
+                Score: {score.toFixed(1)}
+              </div>
+              <div>
+                Round: {rounds + 1}
+              </div>
             </div>
-            <div>
-              Round: {rounds + 1}
+          )}
+          
+          {/* Practice mode header */}
+          {gamePhase === 'practice' && (
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">Practice Mode: Send It</h2>
+              <button
+                onClick={returnToMenu}
+                className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Back to Menu
+              </button>
             </div>
-          </div>
+          )}
           
           {/* Emoji circle */}
           <EmojiCircle 
@@ -248,9 +334,42 @@ function App() {
             activeIndex={activeEmojiIndex}
             transformedPhrases={transformedPhrases}
             isAnimating={isAnimating}
+            showAllPhrases={gamePhase === 'practice'} // Show all phrases in practice mode
           />
           
-          {/* Final phrase (shown after animation) */}
+          {/* Original phrase (shown in practice mode after animation) */}
+          {gamePhase === 'practice' && !isAnimating && (
+            <div className="mt-6 space-y-4">
+              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                <p className="text-center text-lg font-semibold">Original Phrase:</p>
+                <p className="text-center text-xl">{originalPhrase}</p>
+              </div>
+              
+              <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
+                <p className="text-center text-lg font-semibold">Final Transformation:</p>
+                <p className="text-center text-xl">{finalPhrase}</p>
+              </div>
+              
+              <button
+                onClick={() => {
+                  // Reset the needed states to try another phrase
+                  setPracticePhrase('');
+                  setTransformedPhrases([]);
+                  setFinalPhrase('');
+                  setOriginalPhrase('');
+                  setActiveEmojiIndex(0);
+                  
+                  // Return to menu to enter a new phrase
+                  setGamePhase('idle');
+                }}
+                className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Try Another Phrase
+              </button>
+            </div>
+          )}
+          
+          {/* Final phrase (shown after animation in regular game mode) */}
           {gamePhase === 'guessing' && (
             <div className="mt-6 space-y-4">
               <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
