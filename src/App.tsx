@@ -7,12 +7,13 @@ import { gamePhrases } from './data/gamePhrases';
 import { subsampleEmbedding } from './utils/embeddings';
 
 // Game config
-const NUM_EMOJIS = 6;
-// Replace fixed subsample size with a percentage
+const DEFAULT_NUM_EMOJIS = 6; // Default number of emojis
+const MAX_NUM_EMOJIS = 12; // Maximum number of emojis allowed
+const MIN_NUM_EMOJIS = 3; // Minimum number of emojis allowed
 const DEFAULT_VOCAB_PERCENTAGE = 20; // Default: use 20% of available vocabulary
 
-// Emoji set
-const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯'];
+// Emoji set (extended to support the maximum number)
+const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯', '🌈', '🔥', '💎', '🍕', '🎸', '🏆'];
 
 // Game phases
 type GamePhase = 'idle' | 'animating' | 'guessing' | 'gameOver' | 'practice';
@@ -34,7 +35,8 @@ function App() {
   // New state for practice mode
   const [practicePhrase, setPracticePhrase] = useState<string>('');
   
-  // Vocabulary percentage for controlling transformation amount
+  // Game settings
+  const [numEmojis, setNumEmojis] = useState<number>(DEFAULT_NUM_EMOJIS);
   const [vocabPercentage, setVocabPercentage] = useState<number>(DEFAULT_VOCAB_PERCENTAGE);
   const [showSettings, setShowSettings] = useState<boolean>(true);
 
@@ -77,7 +79,7 @@ useEffect(() => {
   load();
 }, []);
 
-  // Generate subsamples whenever the full embedding or vocab percentage changes
+  // Generate subsamples whenever the full embedding, vocab percentage, or number of emojis changes
   useEffect(() => {
     if (Object.keys(fullEmbedding).length === 0) return;
     
@@ -89,13 +91,14 @@ useEffect(() => {
     );
     
     console.log(`Generating vocabularies: ${subsampleSize} words per emoji (${vocabPercentage}% of ${totalVocabSize} total words)`);
+    console.log(`Number of emojis: ${numEmojis}`);
     
     // Generate a subsample for each emoji
-    const samples = Array.from({ length: NUM_EMOJIS }).map(() => 
+    const samples = Array.from({ length: numEmojis }).map(() => 
       subsampleEmbedding(fullEmbedding, subsampleSize)
     );
     setSubsamples(samples);
-  }, [fullEmbedding, vocabPercentage]);
+  }, [fullEmbedding, vocabPercentage, numEmojis]);
 
   // Function to pass phrase through emoji subsamples
   const passPhraseThroughEmojis = useCallback((phrase: string) => {
@@ -163,8 +166,8 @@ useEffect(() => {
     setTimeout(() => {
       setIsAnimating(false);
       setGamePhase('guessing');
-    }, (NUM_EMOJIS + 1) * 1000); // Animation time plus a buffer
-  }, [fullEmbedding, subsamples, passPhraseThroughEmojis]);
+    }, (numEmojis + 1) * 1000); // Animation time plus a buffer
+  }, [fullEmbedding, subsamples, passPhraseThroughEmojis, numEmojis]);
 
   // New function to handle the "Send It" practice mode
   const startPracticeMode = useCallback(() => {
@@ -189,9 +192,9 @@ useEffect(() => {
     setTimeout(() => {
       setIsAnimating(false);
       // Show all emojis as active to display their transformations
-      setActiveEmojiIndex(NUM_EMOJIS - 1);
-    }, (NUM_EMOJIS + 1) * 1000); // Animation time plus a buffer
-  }, [fullEmbedding, subsamples, practicePhrase, passPhraseThroughEmojis]);
+      setActiveEmojiIndex(numEmojis - 1);
+    }, (numEmojis + 1) * 1000); // Animation time plus a buffer
+  }, [fullEmbedding, subsamples, practicePhrase, passPhraseThroughEmojis, numEmojis]);
 
   // Calculate score based on semantic distance
   const calculateScore = useCallback(() => {
@@ -340,11 +343,36 @@ useEffect(() => {
                 onClick={toggleSettings}
                 className="text-sm text-blue-500 hover:underline flex items-center mb-2"
               >
-                {showSettings ? '- Hide Transformation Settings' : '+ Show Transformation Settings'}
+                {showSettings ? '- Hide Game Settings' : '+ Show Game Settings'}
               </button>
               
               {showSettings && (
                 <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+                  {/* Emoji Count Slider */}
+                  <div className="mb-4 border-b pb-3 border-gray-300 dark:border-gray-600">
+                    <label className="block text-sm font-medium mb-1">
+                      Number of Emojis: {numEmojis}
+                    </label>
+                    <input
+                      type="range"
+                      min={MIN_NUM_EMOJIS}
+                      max={MAX_NUM_EMOJIS}
+                      value={numEmojis}
+                      onChange={(e) => setNumEmojis(parseInt(e.target.value))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
+                      <span>Fewer transformations</span>
+                      <span>More transformations</span>
+                    </div>
+                    
+                    <div className="mt-2 text-xs">
+                      <div>More emojis = more transformation steps</div>
+                      <div>Each emoji transforms the phrase using different vocabulary</div>
+                    </div>
+                  </div>
+                  
+                  {/* Vocabulary Percentage Slider */}
                   <label className="block text-sm font-medium mb-1">
                     Vocabulary Percentage: {vocabPercentage}%
                   </label>
@@ -463,7 +491,7 @@ useEffect(() => {
           
           {/* Emoji circle */}
           <EmojiCircle 
-            emojis={EMOJIS}
+            emojis={EMOJIS.slice(0, numEmojis)}
             activeIndex={activeEmojiIndex}
             transformedPhrases={transformedPhrases}
             isAnimating={isAnimating}
