@@ -8,7 +8,8 @@ import { subsampleEmbedding } from './utils/embeddings';
 
 // Game config
 const NUM_EMOJIS = 6;
-const SUBSAMPLE_SIZE = 50; // Size of each emoji's vocabulary
+// Replace fixed subsample size with a percentage
+const DEFAULT_VOCAB_PERCENTAGE = 20; // Default: use 20% of available vocabulary
 
 // Emoji set
 const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯'];
@@ -32,29 +33,69 @@ function App() {
   
   // New state for practice mode
   const [practicePhrase, setPracticePhrase] = useState<string>('');
+  
+  // Vocabulary percentage for controlling transformation amount
+  const [vocabPercentage, setVocabPercentage] = useState<number>(DEFAULT_VOCAB_PERCENTAGE);
+  const [showSettings, setShowSettings] = useState<boolean>(true);
 
-  // Fetch real embeddings for our phrase vocabulary on mount
-  useEffect(() => {
-    const load = async () => {
+  // Fetch real embeddings for our entire vocabulary on mount
+useEffect(() => {
+  const load = async () => {
+    try {
+      // Load the enhanced corpus with both external words and game phrases
+      const { loadEnhancedCorpus } = await import('./utils/corpus');
+      const allWords = await loadEnhancedCorpus();
+      
+      console.log(`Fetching embeddings for ${allWords.length} words...`);
+      
+      // Get embeddings in reasonable-sized batches to avoid API limits
+      const BATCH_SIZE = 1000;
+      let embeds: TEmbedding = {};
+      
+      for (let i = 0; i < allWords.length; i += BATCH_SIZE) {
+        const batch = allWords.slice(i, i + BATCH_SIZE);
+        console.log(`Processing batch ${i/BATCH_SIZE + 1} of ${Math.ceil(allWords.length/BATCH_SIZE)}`);
+        
+        const batchEmbeds = await fetchEmbeddings(batch);
+        embeds = { ...embeds, ...batchEmbeds };
+      }
+      
+      setFullEmbedding(embeds);
+      console.log(`Loaded embeddings for ${Object.keys(embeds).length} words`);
+    } catch (error) {
+      console.error("Error loading corpus or embeddings:", error);
+      
+      // Fallback to just game phrases if corpus loading fails
       const vocab = Array.from(
         new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
       );
       const embeds = await fetchEmbeddings(vocab);
       setFullEmbedding(embeds);
-    };
-    load();
-  }, []);
+    }
+  };
+  
+  load();
+}, []);
 
-  // Generate subsamples whenever the full embedding changes
+  // Generate subsamples whenever the full embedding or vocab percentage changes
   useEffect(() => {
     if (Object.keys(fullEmbedding).length === 0) return;
     
+    // Calculate the actual subsample size based on percentage
+    const totalVocabSize = Object.keys(fullEmbedding).length;
+    const subsampleSize = Math.max(
+      5, // Minimum 5 words to avoid extreme transformations
+      Math.round(vocabPercentage * totalVocabSize / 100)
+    );
+    
+    console.log(`Generating vocabularies: ${subsampleSize} words per emoji (${vocabPercentage}% of ${totalVocabSize} total words)`);
+    
     // Generate a subsample for each emoji
     const samples = Array.from({ length: NUM_EMOJIS }).map(() => 
-      subsampleEmbedding(fullEmbedding, SUBSAMPLE_SIZE)
+      subsampleEmbedding(fullEmbedding, subsampleSize)
     );
     setSubsamples(samples);
-  }, [fullEmbedding]);
+  }, [fullEmbedding, vocabPercentage]);
 
   // Function to pass phrase through emoji subsamples
   const passPhraseThroughEmojis = useCallback((phrase: string) => {
@@ -218,13 +259,40 @@ function App() {
     setScore(0);
     setRounds(0);
     setGamePhase('idle');
+    
     // Refetch embeddings for a fresh run
     (async () => {
-      const vocab = Array.from(
-        new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
-      );
-      const embeds = await fetchEmbeddings(vocab);
-      setFullEmbedding(embeds);
+      try {
+        // Use the same enhanced corpus approach as the initial load
+        const { loadEnhancedCorpus } = await import('./utils/corpus');
+        const allWords = await loadEnhancedCorpus();
+        
+        console.log(`Reloading embeddings for ${allWords.length} words...`);
+        
+        // Get embeddings in batches to avoid API limits
+        const BATCH_SIZE = 1000;
+        let embeds: TEmbedding = {};
+        
+        for (let i = 0; i < allWords.length; i += BATCH_SIZE) {
+          const batch = allWords.slice(i, i + BATCH_SIZE);
+          console.log(`Processing batch ${i/BATCH_SIZE + 1} of ${Math.ceil(allWords.length/BATCH_SIZE)}`);
+          
+          const batchEmbeds = await fetchEmbeddings(batch);
+          embeds = { ...embeds, ...batchEmbeds };
+        }
+        
+        setFullEmbedding(embeds);
+        console.log(`Reloaded embeddings for ${Object.keys(embeds).length} words`);
+      } catch (error) {
+        console.error("Error reloading corpus or embeddings:", error);
+        
+        // Fallback to just game phrases if corpus loading fails
+        const vocab = Array.from(
+          new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
+        );
+        const embeds = await fetchEmbeddings(vocab);
+        setFullEmbedding(embeds);
+      }
     })();
   };
 
@@ -232,6 +300,17 @@ function App() {
   const returnToMenu = () => {
     setGamePhase('idle');
     setPracticePhrase('');
+  };
+
+  // Handle vocab percentage change
+  const handleVocabChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Math.min(100, Math.max(1, parseInt(e.target.value) || DEFAULT_VOCAB_PERCENTAGE));
+    setVocabPercentage(value);
+  };
+
+  // Toggle settings
+  const toggleSettings = () => {
+    setShowSettings(!showSettings);
   };
 
   return (
@@ -254,6 +333,60 @@ function App() {
               <li>Your goal: Guess what the original phrase was</li>
               <li>Score points for correct guesses based on transformation distance</li>
             </ol>
+            
+            {/* Transformation settings */}
+            <div className="mb-4">
+              <button
+                onClick={toggleSettings}
+                className="text-sm text-blue-500 hover:underline flex items-center mb-2"
+              >
+                {showSettings ? '- Hide Transformation Settings' : '+ Show Transformation Settings'}
+              </button>
+              
+              {showSettings && (
+                <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+                  <label className="block text-sm font-medium mb-1">
+                    Vocabulary Percentage: {vocabPercentage}%
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={vocabPercentage}
+                    onChange={handleVocabChange}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
+                    <span>More changes</span>
+                    <span>Fewer changes</span>
+                  </div>
+                  
+                  <div className="mt-3 text-sm">
+                    {vocabPercentage <= 10 && (
+                      <div className="px-2 py-1 bg-red-100 dark:bg-red-900 rounded text-red-700 dark:text-red-200">
+                        Hard: Phrases transform dramatically - challenging to guess
+                      </div>
+                    )}
+                    {vocabPercentage > 10 && vocabPercentage <= 30 && (
+                      <div className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 rounded text-yellow-700 dark:text-yellow-200">
+                        Medium: Balanced transformation - moderate challenge
+                      </div>
+                    )}
+                    {vocabPercentage > 30 && (
+                      <div className="px-2 py-1 bg-green-100 dark:bg-green-900 rounded text-green-700 dark:text-green-200">
+                        Easy: Phrases change less - easier to guess
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-2 text-xs">
+                    <div>Total words in vocabulary: {Object.keys(fullEmbedding).length}</div>
+                    <div>Words per emoji: {Math.round(vocabPercentage * Object.keys(fullEmbedding).length / 100)}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <button 
               onClick={startNewRound}
               className="w-full mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
