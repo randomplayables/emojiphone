@@ -16,7 +16,7 @@ const DEFAULT_VOCAB_PERCENTAGE = 20; // Default: use 20% of available vocabulary
 const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯', '🌈', '🔥', '💎', '🍕', '🎸', '🏆'];
 
 // Game phases
-type GamePhase = 'idle' | 'animating' | 'guessing' | 'gameOver' | 'practice';
+type GamePhase = 'idle' | 'animating' | 'guessing' | 'gameOver' | 'practice' | 'correct';
 
 function App() {
   // Game state
@@ -248,8 +248,8 @@ useEffect(() => {
       setScore(prevScore => prevScore + roundScore);
       setRounds(prevRounds => prevRounds + 1);
       
-      // Show result briefly before starting next round
-      setGamePhase('idle');
+      // Show success screen before starting next round
+      setGamePhase('correct');
       setTimeout(startNewRound, 2000);
     } else {
       // Incorrect guess - game over
@@ -527,6 +527,19 @@ useEffect(() => {
               >
                 Try Another Phrase
               </button>
+            </div>
+          )}
+          
+          {/* Correct guess screen */}
+          {gamePhase === 'correct' && (
+            <div className="mt-6 p-4 bg-green-100 dark:bg-green-900 rounded-lg text-center">
+              <h2 className="text-2xl font-bold mb-2">Correct!</h2>
+              <p className="mb-2">
+                Well done! Loading next round...
+              </p>
+              <p className="text-lg font-semibold">
+                Score: {score.toFixed(1)}
+              </p>
             </div>
           )}
           
