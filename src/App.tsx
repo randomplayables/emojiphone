@@ -1,7 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import EmojiCircle from './components/EmojiCircle';
-import { cosineSimilarity, TEmbedding } from './types';
+import { 
+  cosineSimilarity, 
+  TEmbedding, 
+  PhraseTransformation,
+  TransformationSettings,
+  UserPerformance,
+  GameSession
+} from './types';
 import { fetchEmbeddings } from './utils/openaiEmbeddings';
 import { gamePhrases } from './data/gamePhrases';
 import { subsampleEmbedding } from './utils/embeddings';
@@ -32,7 +39,7 @@ function App() {
   const [activeEmojiIndex, setActiveEmojiIndex] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   
-  // New state for practice mode
+  // Practice mode
   const [practicePhrase, setPracticePhrase] = useState<string>('');
   
   // Game settings
@@ -40,44 +47,57 @@ function App() {
   const [vocabPercentage, setVocabPercentage] = useState<number>(DEFAULT_VOCAB_PERCENTAGE);
   const [showSettings, setShowSettings] = useState<boolean>(true);
 
-  // Fetch real embeddings for our entire vocabulary on mount
-useEffect(() => {
-  const load = async () => {
-    try {
-      // Load the enhanced corpus with both external words and game phrases
-      const { loadEnhancedCorpus } = await import('./utils/corpus');
-      const allWords = await loadEnhancedCorpus();
-      
-      console.log(`Fetching embeddings for ${allWords.length} words...`);
-      
-      // Get embeddings in reasonable-sized batches to avoid API limits
-      const BATCH_SIZE = 1000;
-      let embeds: TEmbedding = {};
-      
-      for (let i = 0; i < allWords.length; i += BATCH_SIZE) {
-        const batch = allWords.slice(i, i + BATCH_SIZE);
-        console.log(`Processing batch ${i/BATCH_SIZE + 1} of ${Math.ceil(allWords.length/BATCH_SIZE)}`);
-        
-        const batchEmbeds = await fetchEmbeddings(batch);
-        embeds = { ...embeds, ...batchEmbeds };
-      }
-      
-      setFullEmbedding(embeds);
-      console.log(`Loaded embeddings for ${Object.keys(embeds).length} words`);
-    } catch (error) {
-      console.error("Error loading corpus or embeddings:", error);
-      
-      // Fallback to just game phrases if corpus loading fails
-      const vocab = Array.from(
-        new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
-      );
-      const embeds = await fetchEmbeddings(vocab);
-      setFullEmbedding(embeds);
-    }
-  };
+  // New state for scientific data collection
+  const [gameSession, setGameSession] = useState<GameSession>({
+    transformations: [],
+    userPerformances: [],
+    sessionStart: Date.now(),
+    sessionId: Math.random().toString(36).substring(2, 15)
+  });
   
-  load();
-}, []);
+  // Refs for timing measurements
+  const guessStartTimeRef = useRef<number>(0);
+  const transformationStartTimeRef = useRef<number>(0);
+  const semanticDistancesRef = useRef<number[]>([]);
+
+  // Fetch real embeddings for our entire vocabulary on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        // Load the enhanced corpus with both external words and game phrases
+        const { loadEnhancedCorpus } = await import('./utils/corpus');
+        const allWords = await loadEnhancedCorpus();
+        
+        console.log(`Fetching embeddings for ${allWords.length} words...`);
+        
+        // Get embeddings in reasonable-sized batches to avoid API limits
+        const BATCH_SIZE = 1000;
+        let embeds: TEmbedding = {};
+        
+        for (let i = 0; i < allWords.length; i += BATCH_SIZE) {
+          const batch = allWords.slice(i, i + BATCH_SIZE);
+          console.log(`Processing batch ${i/BATCH_SIZE + 1} of ${Math.ceil(allWords.length/BATCH_SIZE)}`);
+          
+          const batchEmbeds = await fetchEmbeddings(batch);
+          embeds = { ...embeds, ...batchEmbeds };
+        }
+        
+        setFullEmbedding(embeds);
+        console.log(`Loaded embeddings for ${Object.keys(embeds).length} words`);
+      } catch (error) {
+        console.error("Error loading corpus or embeddings:", error);
+        
+        // Fallback to just game phrases if corpus loading fails
+        const vocab = Array.from(
+          new Set(gamePhrases.flatMap(p => p.toLowerCase().split(' ')))
+        );
+        const embeds = await fetchEmbeddings(vocab);
+        setFullEmbedding(embeds);
+      }
+    };
+    
+    load();
+  }, []);
 
   // Generate subsamples whenever the full embedding, vocab percentage, or number of emojis changes
   useEffect(() => {
@@ -100,9 +120,62 @@ useEffect(() => {
     setSubsamples(samples);
   }, [fullEmbedding, vocabPercentage, numEmojis]);
 
-  // Function to pass phrase through emoji subsamples
+  // Function to calculate semantic distances between phrases
+  const calculateSemanticDistances = useCallback((originalPhrase: string, transformedPhrases: string[]): number[] => {
+    if (!originalPhrase || transformedPhrases.length === 0 || Object.keys(fullEmbedding).length === 0) {
+      return [];
+    }
+
+    const distances: number[] = [];
+    
+    // For each transformed phrase, calculate distance from original
+    transformedPhrases.forEach(phrase => {
+      const origWords = originalPhrase.toLowerCase().split(' ');
+      const transWords = phrase.toLowerCase().split(' ');
+      
+      let totalDistance = 0;
+      const maxLength = Math.max(origWords.length, transWords.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        if (i >= origWords.length || i >= transWords.length) {
+          // Penalize different lengths
+          totalDistance += 1;
+          continue;
+        }
+        
+        const origWord = origWords[i];
+        const transWord = transWords[i];
+        
+        if (origWord === transWord) {
+          // No distance for identical words
+          continue;
+        }
+        
+        // If we have embeddings for both words, compute cosine distance
+        if (fullEmbedding[origWord] && fullEmbedding[transWord]) {
+          const similarity = cosineSimilarity(fullEmbedding[origWord], fullEmbedding[transWord]);
+          totalDistance += (1 - similarity); // Convert similarity to distance
+        } else {
+          // Default penalty for unknown words
+          totalDistance += 1;
+        }
+      }
+      
+      // Normalize by number of words for consistency
+      const normalizedDistance = totalDistance / maxLength;
+      distances.push(normalizedDistance);
+    });
+    
+    return distances;
+  }, [fullEmbedding]);
+
+  // Enhanced version of passPhraseThroughEmojis
   const passPhraseThroughEmojis = useCallback((phrase: string) => {
-    if (subsamples.length === 0) return { transformedPhrases: [], finalPhrase: phrase };
+    if (subsamples.length === 0) return { 
+      transformedPhrases: [], 
+      finalPhrase: phrase, 
+      semanticDistances: [] 
+    };
     
     let currentPhrase = phrase;
     const allPhrases: string[] = [];
@@ -135,26 +208,40 @@ useEffect(() => {
       allPhrases.push(currentPhrase);
     });
     
-    return { transformedPhrases: allPhrases, finalPhrase: currentPhrase };
-  }, [fullEmbedding, subsamples]);
+    // Calculate semantic distances for each transformation step
+    const semanticDistances = calculateSemanticDistances(phrase, allPhrases);
+    
+    return { 
+      transformedPhrases: allPhrases, 
+      finalPhrase: currentPhrase,
+      semanticDistances
+    };
+  }, [fullEmbedding, subsamples, calculateSemanticDistances]);
 
-  // Start a new regular game round
+  // Start a new game round with scientific data collection
   const startNewRound = useCallback(() => {
     if (Object.keys(fullEmbedding).length === 0 || subsamples.length === 0) {
       return; // Game not ready yet
     }
+    
+    // Record when transformation started
+    transformationStartTimeRef.current = Date.now();
     
     // Select a random phrase
     const phrase = gamePhrases[Math.floor(Math.random() * gamePhrases.length)];
     setOriginalPhrase(phrase);
     
     // Process phrase through emoji subsamples
-    const { transformedPhrases, finalPhrase } = passPhraseThroughEmojis(phrase);
+    const { transformedPhrases, finalPhrase, semanticDistances } = passPhraseThroughEmojis(phrase);
+
+    // Store semantic distances for later
+    semanticDistancesRef.current = semanticDistances;
 
     // Development logs: original and intermediate phrases
     console.log('Original phrase:', phrase);
     console.log('Transformed phrases:', transformedPhrases);
     
+    // Set up game state
     setTransformedPhrases(transformedPhrases);
     setFinalPhrase(finalPhrase);
     setGamePhase('animating');
@@ -162,25 +249,62 @@ useEffect(() => {
     setActiveEmojiIndex(0);
     setUserGuess('');
     
+    // Create transformation settings data
+    const transformationSettings: TransformationSettings = {
+      numEmojis,
+      vocabPercentage,
+      vocabSize: Object.keys(fullEmbedding).length,
+      wordsPerEmoji: Math.round(vocabPercentage * Object.keys(fullEmbedding).length / 100)
+    };
+    
+    // Create phrase transformation data
+    const phraseTransformation: PhraseTransformation = {
+      originalPhrase: phrase,
+      transformedPhrases,
+      finalPhrase,
+      transformationSettings,
+      semanticDistances,
+      timestamp: Date.now()
+    };
+    
+    // Add to game session data
+    setGameSession(prev => ({
+      ...prev,
+      transformations: [...prev.transformations, phraseTransformation]
+    }));
+    
+    // Log the transformation data for scientific collection
+    console.log('Scientific Data - Phrase Transformation:', phraseTransformation);
+    
     // After animation completes, move to guessing phase
     setTimeout(() => {
       setIsAnimating(false);
       setGamePhase('guessing');
+      
+      // Record when guessing started
+      guessStartTimeRef.current = Date.now();
     }, (numEmojis + 1) * 1000); // Animation time plus a buffer
-  }, [fullEmbedding, subsamples, passPhraseThroughEmojis, numEmojis]);
+  }, [fullEmbedding, subsamples, passPhraseThroughEmojis, numEmojis, vocabPercentage]);
 
-  // New function to handle the "Send It" practice mode
+  // Enhanced practice mode
   const startPracticeMode = useCallback(() => {
     if (Object.keys(fullEmbedding).length === 0 || subsamples.length === 0 || !practicePhrase.trim()) {
       return; // Not ready or no phrase entered
     }
     
+    // Record when transformation started
+    transformationStartTimeRef.current = Date.now();
+    
     // Process the user's phrase through emoji subsamples
-    const { transformedPhrases, finalPhrase } = passPhraseThroughEmojis(practicePhrase);
+    const { transformedPhrases, finalPhrase, semanticDistances } = passPhraseThroughEmojis(practicePhrase);
+    
+    // Store semantic distances
+    semanticDistancesRef.current = semanticDistances;
     
     console.log('Practice phrase:', practicePhrase);
     console.log('Transformed practice phrases:', transformedPhrases);
     
+    // Set up game state
     setOriginalPhrase(practicePhrase);
     setTransformedPhrases(transformedPhrases);
     setFinalPhrase(finalPhrase);
@@ -188,13 +312,40 @@ useEffect(() => {
     setIsAnimating(true);
     setActiveEmojiIndex(0);
     
+    // Create transformation settings data
+    const transformationSettings: TransformationSettings = {
+      numEmojis,
+      vocabPercentage,
+      vocabSize: Object.keys(fullEmbedding).length,
+      wordsPerEmoji: Math.round(vocabPercentage * Object.keys(fullEmbedding).length / 100)
+    };
+    
+    // Create phrase transformation data
+    const phraseTransformation: PhraseTransformation = {
+      originalPhrase: practicePhrase,
+      transformedPhrases,
+      finalPhrase,
+      transformationSettings,
+      semanticDistances,
+      timestamp: Date.now()
+    };
+    
+    // Add to game session data
+    setGameSession(prev => ({
+      ...prev,
+      transformations: [...prev.transformations, phraseTransformation]
+    }));
+    
+    // Log the transformation data for scientific collection
+    console.log('Scientific Data - Practice Transformation:', phraseTransformation);
+    
     // After animation completes, stop animating but stay in practice mode
     setTimeout(() => {
       setIsAnimating(false);
       // Show all emojis as active to display their transformations
       setActiveEmojiIndex(numEmojis - 1);
     }, (numEmojis + 1) * 1000); // Animation time plus a buffer
-  }, [fullEmbedding, subsamples, practicePhrase, passPhraseThroughEmojis, numEmojis]);
+  }, [fullEmbedding, subsamples, practicePhrase, passPhraseThroughEmojis, numEmojis, vocabPercentage]);
 
   // Calculate score based on semantic distance
   const calculateScore = useCallback(() => {
@@ -237,31 +388,93 @@ useEffect(() => {
     return Math.max(0, 10 - (totalDistance * 2)) * originalWords.length;
   }, [originalPhrase, finalPhrase, fullEmbedding]);
 
-  // Handle user's guess
+  // Enhanced submit guess
   const submitGuess = useCallback(() => {
     if (gamePhase !== 'guessing') return;
     
+    const guessEndTime = Date.now();
+    const timeToGuess = guessEndTime - guessStartTimeRef.current;
+    
+    // Get overall semantic distance (last element if available)
+    const semanticDistance = semanticDistancesRef.current.length > 0 
+      ? semanticDistancesRef.current[semanticDistancesRef.current.length - 1] 
+      : 0;
+    
     // Check if guess matches the original phrase (case-insensitive)
-    if (userGuess.toLowerCase() === originalPhrase.toLowerCase()) {
+    const isCorrect = userGuess.toLowerCase() === originalPhrase.toLowerCase();
+    
+    if (isCorrect) {
       // Correct guess - award points
       const roundScore = calculateScore();
       setScore(prevScore => prevScore + roundScore);
       setRounds(prevRounds => prevRounds + 1);
+      
+      // Create user performance data
+      const userPerformance: UserPerformance = {
+        originalPhrase,
+        finalPhrase,
+        userGuess,
+        isCorrect: true,
+        score: roundScore,
+        semanticDistance,
+        timeToGuess,
+        timestamp: Date.now()
+      };
+      
+      // Add to game session data
+      setGameSession(prev => ({
+        ...prev,
+        userPerformances: [...prev.userPerformances, userPerformance]
+      }));
+      
+      // Log the performance data for scientific collection
+      console.log('Scientific Data - User Performance (Correct):', userPerformance);
       
       // Show success screen before starting next round
       setGamePhase('correct');
       setTimeout(startNewRound, 2000);
     } else {
       // Incorrect guess - game over
+      const userPerformance: UserPerformance = {
+        originalPhrase,
+        finalPhrase,
+        userGuess,
+        isCorrect: false,
+        score: 0,
+        semanticDistance,
+        timeToGuess,
+        timestamp: Date.now()
+      };
+      
+      // Add to game session data
+      setGameSession(prev => ({
+        ...prev,
+        userPerformances: [...prev.userPerformances, userPerformance]
+      }));
+      
+      // Log the performance data for scientific collection
+      console.log('Scientific Data - User Performance (Incorrect):', userPerformance);
+      
       setGamePhase('gameOver');
     }
-  }, [gamePhase, userGuess, originalPhrase, calculateScore, startNewRound]);
+  }, [gamePhase, userGuess, originalPhrase, finalPhrase, calculateScore, startNewRound]);
 
   // Restart the game after game over
-  const restartGame = () => {
+  const restartGame = useCallback(() => {
+    // Log full session data before resetting
+    console.log('Scientific Data - Complete Game Session:', gameSession);
+    
     setScore(0);
     setRounds(0);
     setGamePhase('idle');
+    
+    // Create new session
+    setGameSession({
+      transformations: [],
+      userPerformances: [],
+      sessionStart: Date.now(),
+      sessionId: Math.random().toString(36).substring(2, 15)
+    });
     
     // Refetch embeddings for a fresh run
     (async () => {
@@ -297,24 +510,38 @@ useEffect(() => {
         setFullEmbedding(embeds);
       }
     })();
-  };
+  }, [gameSession]);
 
   // Return to the main menu from practice mode
-  const returnToMenu = () => {
+  const returnToMenu = useCallback(() => {
     setGamePhase('idle');
     setPracticePhrase('');
-  };
+  }, []);
 
   // Handle vocab percentage change
-  const handleVocabChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVocabChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Math.min(100, Math.max(1, parseInt(e.target.value) || DEFAULT_VOCAB_PERCENTAGE));
     setVocabPercentage(value);
-  };
+  }, []);
 
   // Toggle settings
-  const toggleSettings = () => {
+  const toggleSettings = useCallback(() => {
     setShowSettings(!showSettings);
-  };
+  }, [showSettings]);
+
+  // On component unmount or when user navigates away, log final data
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      console.log('Scientific Data - Final Game Session on Exit:', gameSession);
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      console.log('Scientific Data - Final Game Session on Unmount:', gameSession);
+    };
+  }, [gameSession]);
 
   return (
     <div className="max-w-2xl mx-auto p-4">

@@ -18,3 +18,43 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   if (magA === 0 || magB === 0) return 0;
   return dot / (magA * magB);
 }
+
+// Types for scientific data collection
+
+// Track a single phrase transformation
+export interface PhraseTransformation {
+  originalPhrase: string;
+  transformedPhrases: string[];  // Each step of transformation
+  finalPhrase: string;
+  transformationSettings: TransformationSettings;
+  semanticDistances: number[];   // Semantic distance at each step
+  timestamp: number;             // When this transformation occurred
+}
+
+// Game settings when a transformation occurs
+export interface TransformationSettings {
+  numEmojis: number;
+  vocabPercentage: number;
+  vocabSize: number;             // Total vocabulary size
+  wordsPerEmoji: number;         // Words per emoji vocabulary
+}
+
+// Track user performance in the game
+export interface UserPerformance {
+  originalPhrase: string;
+  finalPhrase: string;
+  userGuess: string;
+  isCorrect: boolean;
+  score: number;
+  semanticDistance: number;      // Between original and final
+  timeToGuess: number;           // In milliseconds
+  timestamp: number;
+}
+
+// Session data to track overall play session
+export interface GameSession {
+  transformations: PhraseTransformation[];
+  userPerformances: UserPerformance[];
+  sessionStart: number;
+  sessionId: string;             // Random ID for the session
+}
