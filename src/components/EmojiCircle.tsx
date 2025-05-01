@@ -85,7 +85,9 @@ const EmojiCircle = ({
             {/* Show the phrase if: 
                 1. The emoji is highlighted during animation, OR
                 2. showAllPhrases is true AND this emoji is active */}
-            {(isHighlighted || (showAllPhrases && isActive && i < transformedPhrases.length)) && (
+            {(isHighlighted || (showAllPhrases && isActive && i < transformedPhrases.length)
+            // always show the final tooltip when the animation is over
+            || (!isAnimating && i === emojis.length - 1)) && (
               <div className={`absolute left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 px-2 py-1 rounded-md shadow-md text-sm w-max max-w-40 z-10 ${tooltipClass}`}>
                 {/* In practice mode (showAllPhrases), show each transformation.
                     In regular mode, only show the final phrase at the last step */}
