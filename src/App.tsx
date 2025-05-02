@@ -574,20 +574,22 @@ function App() {
               </button>
               
               {showSettings && (
-                <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+                <div className="p-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
                   {/* Emoji Count Slider */}
                   <div className="mb-4 border-b pb-3 border-gray-300 dark:border-gray-600">
                     <label className="block text-sm font-medium mb-1">
                       Number of Emojis: {numEmojis}
                     </label>
-                    <input
-                      type="range"
-                      min={MIN_NUM_EMOJIS}
-                      max={MAX_NUM_EMOJIS}
-                      value={numEmojis}
-                      onChange={(e) => setNumEmojis(parseInt(e.target.value))}
-                      className="w-full"
-                    />
+                    <div className="px-2">
+                      <input
+                        type="range"
+                        min={MIN_NUM_EMOJIS}
+                        max={MAX_NUM_EMOJIS}
+                        value={numEmojis}
+                        onChange={(e) => setNumEmojis(parseInt(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
                     <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
                       <span>Fewer transformations</span>
                       <span>More transformations</span>
@@ -603,14 +605,16 @@ function App() {
                   <label className="block text-sm font-medium mb-1">
                     Vocabulary Percentage: {vocabPercentage}%
                   </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="100"
-                    value={vocabPercentage}
-                    onChange={handleVocabChange}
-                    className="w-full"
-                  />
+                  <div className="px-2">
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={vocabPercentage}
+                      onChange={handleVocabChange}
+                      className="w-full"
+                    />
+                  </div>
                   <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
                     <span>More changes</span>
                     <span>Fewer changes</span>
@@ -657,14 +661,16 @@ function App() {
               Enter your own phrase and see how it transforms through each emoji!
             </p>
             <div className="space-y-2">
-              <input
-                type="text"
-                value={practicePhrase}
-                onChange={(e) => setPracticePhrase(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && startPracticeMode()}
-                className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                placeholder="Enter a phrase to transform..."
-              />
+              <div className="input-container relative">
+                <input
+                  type="text"
+                  value={practicePhrase}
+                  onChange={(e) => setPracticePhrase(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && startPracticeMode()}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  placeholder="Enter a phrase to transform..."
+                />
+              </div>
               <button
                 onClick={startPracticeMode}
                 disabled={!practicePhrase.trim()}
@@ -728,14 +734,14 @@ function App() {
           {/* Original phrase (shown in practice mode after animation) */}
           {gamePhase === 'practice' && !isAnimating && (
             <div className="mt-6 space-y-4">
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                <p className="text-center text-lg font-semibold">Original Phrase:</p>
-                <p className="text-center text-xl">{originalPhrase}</p>
+              <div className="p-4 bg-teal-50 dark:bg-teal-900 rounded-lg border-l-4 border-teal-400">
+                <p className="text-center text-lg font-semibold text-teal-800 dark:text-teal-200">Original Phrase:</p>
+                <p className="text-center text-xl text-teal-900 dark:text-teal-100">{originalPhrase}</p>
               </div>
               
-              <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                <p className="text-center text-lg font-semibold">Final Transformation:</p>
-                <p className="text-center text-xl">{finalPhrase}</p>
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900 rounded-lg border-l-4 border-indigo-400">
+                <p className="text-center text-lg font-semibold text-indigo-800 dark:text-indigo-200">Final Transformation:</p>
+                <p className="text-center text-xl text-indigo-900 dark:text-indigo-100">{finalPhrase}</p>
               </div>
               
               <button
@@ -750,7 +756,7 @@ function App() {
                   // Return to menu to enter a new phrase
                   setGamePhase('idle');
                 }}
-                className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors"
               >
                 Try Another Phrase
               </button>
@@ -760,11 +766,11 @@ function App() {
           {/* Correct guess screen */}
           {gamePhase === 'correct' && (
             <div className="mt-6 p-4 bg-green-100 dark:bg-green-900 rounded-lg text-center">
-              <h2 className="text-2xl font-bold mb-2">Correct!</h2>
-              <p className="mb-2">
+              <h2 className="text-2xl font-bold mb-2 text-green-800 dark:text-green-200">Correct!</h2>
+              <p className="mb-2 text-green-700 dark:text-green-300">
                 Well done! Loading next round...
               </p>
-              <p className="text-lg font-semibold">
+              <p className="text-lg font-semibold text-green-800 dark:text-green-200">
                 Score: {score.toFixed(1)}
               </p>
             </div>
@@ -773,12 +779,12 @@ function App() {
           {/* Final phrase (shown after animation in regular game mode) */}
           {gamePhase === 'guessing' && (
             <div className="mt-6 space-y-4">
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                <p className="text-center text-lg font-semibold">Final Phrase:</p>
-                <p className="text-center text-xl">{finalPhrase}</p>
+              <div className="final-phrase p-4 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                <p className="text-center text-lg font-semibold text-yellow-800 dark:text-yellow-200">Final Phrase:</p>
+                <p className="text-center text-xl text-yellow-900 dark:text-yellow-100">{finalPhrase}</p>
               </div>
               
-              <div className="space-y-2">
+              <div className="guess-container space-y-3">
                 <label className="block text-sm font-medium">
                   Guess the original phrase:
                 </label>
@@ -787,13 +793,13 @@ function App() {
                   value={userGuess}
                   onChange={(e) => setUserGuess(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && submitGuess()}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full p-3 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                   placeholder="Type your guess here..."
                   autoFocus
                 />
                 <button
                   onClick={submitGuess}
-                  className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+                  className="w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors"
                 >
                   Submit Guess
                 </button>
@@ -804,16 +810,16 @@ function App() {
           {/* Game over screen */}
           {gamePhase === 'gameOver' && (
             <div className="mt-6 p-4 bg-red-100 dark:bg-red-900 rounded-lg text-center">
-              <h2 className="text-2xl font-bold mb-2">Game Over!</h2>
-              <p className="mb-4">
-                The original phrase was: <strong>{originalPhrase}</strong>
+              <h2 className="text-2xl font-bold mb-3 text-gray-800 dark:text-gray-200">Game Over!</h2>
+              <p className="mb-4 text-gray-700 dark:text-gray-300">
+                The original phrase was: <strong className="text-gray-900 dark:text-white">{originalPhrase}</strong>
               </p>
-              <p className="mb-4">
-                Final Score: <strong>{score.toFixed(1)}</strong> points in {rounds} rounds
+              <p className="mb-4 text-gray-700 dark:text-gray-300">
+                Final Score: <strong className="text-gray-900 dark:text-white">{score.toFixed(1)}</strong> points in {rounds} rounds
               </p>
               <button
                 onClick={restartGame}
-                className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                className="bg-blue-500 text-white py-2 px-6 rounded-lg hover:bg-blue-600 transition-colors"
               >
                 Play Again
               </button>

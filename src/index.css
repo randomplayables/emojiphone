@@ -215,3 +215,152 @@ button:focus-visible {
 .bg-white {
   background-color: #ffffff;
 }
+
+/* Emojiphone CSS Fixes */
+
+/* General color adjustments for better contrast and visual hierarchy */
+:root {
+  --primary-bg: #f8f9fa;
+  --secondary-bg: #e9ecef;
+  --dark-bg: #212529;
+  --primary-text: #212529;
+  --secondary-text: #495057;
+  --light-text: #f8f9fa;
+  --accent-blue: #4361ee;
+  --accent-green: #38b000;
+  --accent-yellow: #ffb703;
+  --accent-red: #d00000;
+  --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --border-radius: 0.5rem;
+}
+
+/* Fix for text legibility on colored backgrounds */
+.bg-gray-100, .dark\:bg-gray-800 {
+  color: var(--primary-text);
+  background-color: var(--secondary-bg) !important;
+}
+
+/* Fix for dark mode texts */
+@media (prefers-color-scheme: dark) {
+  .bg-gray-100, .dark\:bg-gray-800 {
+    color: var(--light-text);
+    background-color: #2c3e50 !important;
+  }
+}
+
+/* Fix for the game setup and practice setup boxes */
+.bg-gray-100, .dark\:bg-gray-800 {
+  margin-bottom: 1.5rem; /* Add space between the boxes */
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  overflow: hidden; /* Ensure content doesn't spill out */
+}
+
+/* Fix for text input fields extending beyond container */
+input[type="text"], input[type="range"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Fix for sliders going outside their container */
+input[type="range"] {
+  display: block;
+  width: 95%; /* Slightly less than 100% to ensure it stays inside */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Fix for the final phrase display in games (currently blue on brown) */
+.bg-yellow-100, .dark\:bg-yellow-900 {
+  background-color: #f8f9fa !important;
+  color: #212529 !important;
+  border-left: 4px solid var(--accent-yellow);
+}
+
+/* Dark mode adjustment */
+@media (prefers-color-scheme: dark) {
+  .bg-yellow-100, .dark\:bg-yellow-900 {
+    background-color: #343a40 !important;
+    color: #f8f9fa !important;
+  }
+}
+
+/* Fix for game over box (blue text on red background) */
+.bg-red-100, .dark\:bg-red-900 {
+  background-color: #f8f9fa !important;
+  color: #212529 !important;
+  border-left: 4px solid var(--accent-red);
+}
+
+/* Dark mode adjustment */
+@media (prefers-color-scheme: dark) {
+  .bg-red-100, .dark\:bg-red-900 {
+    background-color: #343a40 !important;
+    color: #f8f9fa !important;
+  }
+}
+
+/* Make all bottom boxes (final phrase, guess input, submit) the same width */
+.mt-6.space-y-4 > div, 
+.mt-6.space-y-4 > div.space-y-2,
+.mt-6.space-y-4 > div.space-y-2 input,
+.mt-6.space-y-4 > div.space-y-2 button {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Additional styling for better visual aesthetics */
+button {
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+}
+
+/* Improvement for game settings section */
+.bg-gray-200, .dark\:bg-gray-700 {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  border-radius: 0.4rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-gray-200, .dark\:bg-gray-700 {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+}
+
+/* Better visibility for the medium difficulty indicator */
+.px-2.py-1.bg-yellow-100 {
+  background-color: var(--accent-yellow) !important;
+  color: #212529 !important;
+  font-weight: 600;
+}
+
+/* Improve input contrast */
+input[type="text"] {
+  border: 2px solid #ced4da;
+  padding: 0.75rem 1rem;
+  transition: border-color 0.15s ease-in-out;
+}
+
+input[type="text"]:focus {
+  border-color: var(--accent-blue);
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+}
+
+/* Make the emoji circle dashed border blue instead of gray */
+.border-dashed.border-gray-300.rounded-full {
+  border-color: rgba(67, 97, 238, 0.5) !important;
+  border-width: 3px;
+}
+
+/* Dark mode adjustment for the circle */
+@media (prefers-color-scheme: dark) {
+  .border-dashed.border-gray-300.rounded-full {
+    border-color: rgba(67, 97, 238, 0.4) !important;
+  }
+}
