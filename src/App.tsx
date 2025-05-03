@@ -17,7 +17,7 @@ import { subsampleEmbedding } from './utils/embeddings';
 const DEFAULT_NUM_EMOJIS = 6; // Default number of emojis
 const MAX_NUM_EMOJIS = 12; // Maximum number of emojis allowed
 const MIN_NUM_EMOJIS = 3; // Minimum number of emojis allowed
-const DEFAULT_VOCAB_PERCENTAGE = 20; // Default: use 20% of available vocabulary
+const DEFAULT_VOCAB_PERCENTAGE = 60; // Default: use 60% of available vocabulary
 
 // Emoji set (extended to support the maximum number)
 const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯', '🌈', '🔥', '💎', '🍕', '🎸', '🏆'];
@@ -45,7 +45,7 @@ function App() {
   // Game settings
   const [numEmojis, setNumEmojis] = useState<number>(DEFAULT_NUM_EMOJIS);
   const [vocabPercentage, setVocabPercentage] = useState<number>(DEFAULT_VOCAB_PERCENTAGE);
-  const [showSettings, setShowSettings] = useState<boolean>(true);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // New state for scientific data collection
   const [gameSession, setGameSession] = useState<GameSession>({
@@ -621,17 +621,17 @@ function App() {
                   </div>
                   
                   <div className="mt-3 text-sm">
-                    {vocabPercentage <= 10 && (
+                    {vocabPercentage <= 55 && (
                       <div className="px-2 py-1 bg-red-100 dark:bg-red-900 rounded text-red-700 dark:text-red-200">
                         Hard: Phrases transform dramatically - challenging to guess
                       </div>
                     )}
-                    {vocabPercentage > 10 && vocabPercentage <= 30 && (
+                    {vocabPercentage > 55 && vocabPercentage <= 80 && (
                       <div className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 rounded text-yellow-700 dark:text-yellow-200">
                         Medium: Balanced transformation - moderate challenge
                       </div>
                     )}
-                    {vocabPercentage > 30 && (
+                    {vocabPercentage > 80 && (
                       <div className="px-2 py-1 bg-green-100 dark:bg-green-900 rounded text-green-700 dark:text-green-200">
                         Easy: Phrases change less - easier to guess
                       </div>

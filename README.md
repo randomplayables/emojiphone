@@ -1,50 +1,57 @@
-# React + TypeScript + Vite
+# Emojiphone
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Overview
 
-Currently, two official plugins are available:
+Emojiphone is a word transformation game inspired by the classic telephone game, but with a mathematical twist using vector embeddings and subsampling.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## How It Works
 
-## Expanding the ESLint configuration
+1. **Vector Transformations:** The game uses word embeddings (semantic vector representations of words) to transform phrases as they pass through emoji filters.
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+2. **Telephone Effect:** Each emoji has a limited vocabulary, forcing words to transform into their closest semantic neighbors within that vocabulary.
 
-- Configure the top-level `parserOptions` property like this:
+3. **Scientific Collection:** The game collects data on semantic drift and human ability to reconstruct original meaning.
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+## Game Modes
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+### Regular Game Mode
+- A famous quote or phrase passes through a series of emoji filters
+- Each emoji transforms the phrase based on its limited vocabulary
+- You see the final transformed phrase and must guess the original
+- Score points for correct guesses - harder transformations earn more points
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+### "Send It" Practice Mode
+- Enter your own phrase and watch how it transforms
+- See the step-by-step transformation through each emoji
+- Great for understanding how the transformation process works
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+## Gameplay Settings
+
+Customize your experience with adjustable settings:
+
+- **Number of Emojis:** More emojis mean more transformation steps and greater semantic drift
+- **Vocabulary Percentage:** Controls how restricted each emoji's vocabulary is:
+  - Low percentage (1-55%): Dramatic transformations, very challenging
+  - Medium percentage (56-80%): Balanced transformations, moderate challenge
+  - High percentage (81-100%): Subtle transformations, easier guessing
+
+## Technical Features
+
+- Uses OpenAI's embedding model for semantic word representations
+- Implements cosine similarity for finding nearest word neighbors
+- Collects scientific data on semantic transformations for research
+
+## Development
+
+This game was built using:
+- React
+- TypeScript
+- Vite
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contact
+
+randomplayables@proton.me
