@@ -12,6 +12,7 @@ import {
 import { fetchEmbeddings } from './utils/openaiEmbeddings';
 import { gamePhrases } from './data/gamePhrases';
 import { subsampleEmbedding } from './utils/embeddings';
+import { initGameSession, saveGameData } from './services/apiService'; // Import new functions
 
 // Game config
 const DEFAULT_NUM_EMOJIS = 6; // Default number of emojis
@@ -59,6 +60,14 @@ function App() {
   const guessStartTimeRef = useRef<number>(0);
   const transformationStartTimeRef = useRef<number>(0);
   const semanticDistancesRef = useRef<number[]>([]);
+
+  // Initialize game session on mount
+  useEffect(() => {
+    initGameSession().then(session => {
+        console.log("Emojiphone session initialized:", session);
+        // You can store session info if needed, e.g., setSessionId(session.sessionId);
+    });
+  }, []);
 
   // Fetch real embeddings for our entire vocabulary on mount
   useEffect(() => {
@@ -275,6 +284,7 @@ function App() {
     
     // Log the transformation data for scientific collection
     console.log('Scientific Data - Phrase Transformation:', phraseTransformation);
+    saveGameData('transformation', { roundNumber: rounds, ...phraseTransformation });
     
     // After animation completes, move to guessing phase
     setTimeout(() => {
@@ -284,7 +294,7 @@ function App() {
       // Record when guessing started
       guessStartTimeRef.current = Date.now();
     }, (numEmojis + 1) * 1000); // Animation time plus a buffer
-  }, [fullEmbedding, subsamples, passPhraseThroughEmojis, numEmojis, vocabPercentage]);
+  }, [fullEmbedding, subsamples, passPhraseThroughEmojis, numEmojis, vocabPercentage, rounds]);
 
   // Enhanced practice mode
   const startPracticeMode = useCallback(() => {
@@ -338,6 +348,7 @@ function App() {
     
     // Log the transformation data for scientific collection
     console.log('Scientific Data - Practice Transformation:', phraseTransformation);
+    saveGameData('practice_transformation', { roundNumber: rounds, ...phraseTransformation });
     
     // After animation completes, stop animating but stay in practice mode
     setTimeout(() => {
@@ -345,7 +356,7 @@ function App() {
       // Show all emojis as active to display their transformations
       setActiveEmojiIndex(numEmojis - 1);
     }, (numEmojis + 1) * 1000); // Animation time plus a buffer
-  }, [fullEmbedding, subsamples, practicePhrase, passPhraseThroughEmojis, numEmojis, vocabPercentage]);
+  }, [fullEmbedding, subsamples, practicePhrase, passPhraseThroughEmojis, numEmojis, vocabPercentage, rounds]);
 
   // Calculate score based on semantic distance
   const calculateScore = useCallback(() => {
@@ -429,6 +440,7 @@ function App() {
       
       // Log the performance data for scientific collection
       console.log('Scientific Data - User Performance (Correct):', userPerformance);
+      saveGameData('performance', { roundNumber: rounds, ...userPerformance });
       
       // Show success screen before starting next round
       setGamePhase('correct');
@@ -454,15 +466,17 @@ function App() {
       
       // Log the performance data for scientific collection
       console.log('Scientific Data - User Performance (Incorrect):', userPerformance);
+      saveGameData('performance', { roundNumber: rounds, ...userPerformance });
       
       setGamePhase('gameOver');
     }
-  }, [gamePhase, userGuess, originalPhrase, finalPhrase, calculateScore, startNewRound]);
+  }, [gamePhase, userGuess, originalPhrase, finalPhrase, calculateScore, startNewRound, rounds]);
 
   // Restart the game after game over
   const restartGame = useCallback(() => {
     // Log full session data before resetting
     console.log('Scientific Data - Complete Game Session:', gameSession);
+    saveGameData('session_end', { ...gameSession, finalScore: score, roundsCompleted: rounds });
     
     setScore(0);
     setRounds(0);
@@ -510,7 +524,7 @@ function App() {
         setFullEmbedding(embeds);
       }
     })();
-  }, [gameSession]);
+  }, [gameSession, score, rounds]);
 
   // Return to the main menu from practice mode
   const returnToMenu = useCallback(() => {
@@ -533,6 +547,7 @@ function App() {
   useEffect(() => {
     const handleBeforeUnload = () => {
       console.log('Scientific Data - Final Game Session on Exit:', gameSession);
+      saveGameData('session_end', { ...gameSession, finalScore: score, roundsCompleted: rounds, reason: 'unload' });
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -541,7 +556,7 @@ function App() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       console.log('Scientific Data - Final Game Session on Unmount:', gameSession);
     };
-  }, [gameSession]);
+  }, [gameSession, score, rounds]);
 
   return (
     <div className="max-w-2xl mx-auto p-4">
