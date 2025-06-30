@@ -60,6 +60,7 @@ function App() {
   const guessStartTimeRef = useRef<number>(0);
   const transformationStartTimeRef = useRef<number>(0);
   const semanticDistancesRef = useRef<number[]>([]);
+  const hasLoadedEmbeddings = useRef(false); // Ref to prevent double loading
 
   // Initialize game session on mount
   useEffect(() => {
@@ -71,6 +72,12 @@ function App() {
 
   // Fetch real embeddings for our entire vocabulary on mount
   useEffect(() => {
+    // Prevent this effect from running twice in development with Strict Mode
+    if (hasLoadedEmbeddings.current) {
+      return;
+    }
+    hasLoadedEmbeddings.current = true;
+
     const load = async () => {
       try {
         // Load the enhanced corpus with both external words and game phrases
