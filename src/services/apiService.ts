@@ -180,6 +180,7 @@ export async function fetchPlatformEmbeddings(words: string[]): Promise<TEmbeddi
       method: 'POST',
       headers,
       body: JSON.stringify({ words }),
+      credentials: 'include',
     });
 
     if (!response.ok) {
