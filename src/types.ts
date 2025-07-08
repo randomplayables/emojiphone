@@ -47,6 +47,7 @@ export interface UserPerformance {
   isCorrect: boolean;
   score: number;
   semanticDistance: number;      // Between original and final
+  similarity?: number;           // Levenshtein similarity between guess and original
   timeToGuess: number;           // In milliseconds
   timestamp: number;
 }

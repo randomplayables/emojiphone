@@ -13,12 +13,13 @@ import { fetchEmbeddings } from './utils/openaiEmbeddings';
 import { gamePhrases } from './data/gamePhrases';
 import { subsampleEmbedding } from './utils/embeddings';
 import { initGameSession, saveGameData } from './services/apiService'; // Import new functions
+import { calculateStringSimilarity } from './utils/similarity';
 
 // Game config
 const DEFAULT_NUM_EMOJIS = 6; // Default number of emojis
 const MAX_NUM_EMOJIS = 12; // Maximum number of emojis allowed
 const MIN_NUM_EMOJIS = 3; // Minimum number of emojis allowed
-const DEFAULT_VOCAB_PERCENTAGE = 60; // Default: use 60% of available vocabulary
+const DEFAULT_VOCAB_PERCENTAGE = 85; // Default: use 85% of available vocabulary
 
 // Emoji set (extended to support the maximum number)
 const EMOJIS = ['😀', '🎮', '🚀', '🧠', '🤖', '🎯', '🌈', '🔥', '💎', '🍕', '🎸', '🏆'];
@@ -47,6 +48,7 @@ function App() {
   const [numEmojis, setNumEmojis] = useState<number>(DEFAULT_NUM_EMOJIS);
   const [vocabPercentage, setVocabPercentage] = useState<number>(DEFAULT_VOCAB_PERCENTAGE);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [accuracyBuffer, setAccuracyBuffer] = useState<number>(5); // New state for the buffer (0-10%)
 
   // New state for scientific data collection
   const [gameSession, setGameSession] = useState<GameSession>({
@@ -418,12 +420,13 @@ function App() {
       ? semanticDistancesRef.current[semanticDistancesRef.current.length - 1] 
       : 0;
     
-    // Check if guess matches the original phrase (case-insensitive)
-    const isCorrect = userGuess.toLowerCase() === originalPhrase.toLowerCase();
+    const similarity = calculateStringSimilarity(userGuess, originalPhrase);
+    const requiredSimilarity = 100 - accuracyBuffer;
+    const isCorrect = similarity >= requiredSimilarity;
     
     if (isCorrect) {
-      // Correct guess - award points
-      const roundScore = calculateScore();
+      // Correct guess - award points, scaled by similarity
+      const roundScore = calculateScore() * (similarity / 100);
       setScore(prevScore => prevScore + roundScore);
       setRounds(prevRounds => prevRounds + 1);
       
@@ -435,6 +438,7 @@ function App() {
         isCorrect: true,
         score: roundScore,
         semanticDistance,
+        similarity,
         timeToGuess,
         timestamp: Date.now()
       };
@@ -461,6 +465,7 @@ function App() {
         isCorrect: false,
         score: 0,
         semanticDistance,
+        similarity,
         timeToGuess,
         timestamp: Date.now()
       };
@@ -477,7 +482,7 @@ function App() {
       
       setGamePhase('gameOver');
     }
-  }, [gamePhase, userGuess, originalPhrase, finalPhrase, calculateScore, startNewRound, rounds]);
+  }, [gamePhase, userGuess, originalPhrase, finalPhrase, calculateScore, startNewRound, rounds, accuracyBuffer]);
 
   // Restart the game after game over
   const restartGame = useCallback(() => {
@@ -624,46 +629,71 @@ function App() {
                   </div>
                   
                   {/* Vocabulary Percentage Slider */}
-                  <label className="block text-sm font-medium mb-1">
-                    Vocabulary Percentage: {vocabPercentage}%
-                  </label>
-                  <div className="px-2">
-                    <input
-                      type="range"
-                      min="1"
-                      max="100"
-                      value={vocabPercentage}
-                      onChange={handleVocabChange}
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
-                    <span>More changes</span>
-                    <span>Fewer changes</span>
+                  <div className="mb-4 border-b pb-3 border-gray-300 dark:border-gray-600">
+                    <label className="block text-sm font-medium mb-1">
+                      Vocabulary Percentage: {vocabPercentage}%
+                    </label>
+                    <div className="px-2">
+                      <input
+                        type="range"
+                        min="1"
+                        max="100"
+                        value={vocabPercentage}
+                        onChange={handleVocabChange}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
+                      <span>More changes</span>
+                      <span>Fewer changes</span>
+                    </div>
+                    
+                    <div className="mt-3 text-sm">
+                      {vocabPercentage <= 55 && (
+                        <div className="px-2 py-1 bg-red-100 dark:bg-red-900 rounded text-red-700 dark:text-red-200">
+                          Hard: Phrases transform dramatically - challenging to guess
+                        </div>
+                      )}
+                      {vocabPercentage > 55 && vocabPercentage <= 80 && (
+                        <div className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 rounded text-yellow-700 dark:text-yellow-200">
+                          Medium: Balanced transformation - moderate challenge
+                        </div>
+                      )}
+                      {vocabPercentage > 80 && (
+                        <div className="px-2 py-1 bg-green-100 dark:bg-green-900 rounded text-green-700 dark:text-green-200">
+                          Easy: Phrases change less - easier to guess
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-2 text-xs">
+                      <div>Total words in vocabulary: {Object.keys(fullEmbedding).length}</div>
+                      <div>Words per emoji: {Math.round(vocabPercentage * Object.keys(fullEmbedding).length / 100)}</div>
+                    </div>
                   </div>
                   
-                  <div className="mt-3 text-sm">
-                    {vocabPercentage <= 55 && (
-                      <div className="px-2 py-1 bg-red-100 dark:bg-red-900 rounded text-red-700 dark:text-red-200">
-                        Hard: Phrases transform dramatically - challenging to guess
-                      </div>
-                    )}
-                    {vocabPercentage > 55 && vocabPercentage <= 80 && (
-                      <div className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 rounded text-yellow-700 dark:text-yellow-200">
-                        Medium: Balanced transformation - moderate challenge
-                      </div>
-                    )}
-                    {vocabPercentage > 80 && (
-                      <div className="px-2 py-1 bg-green-100 dark:bg-green-900 rounded text-green-700 dark:text-green-200">
-                        Easy: Phrases change less - easier to guess
-                      </div>
-                    )}
+                  {/* Accuracy Buffer Slider */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Accuracy Buffer: {accuracyBuffer}%
+                    </label>
+                    <div className="px-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="10"
+                        step="1"
+                        value={accuracyBuffer}
+                        onChange={(e) => setAccuracyBuffer(parseInt(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs mt-1 text-gray-600 dark:text-gray-400">
+                      <span>Exact Match</span>
+                      <span>More Leeway</span>
+                    </div>
                   </div>
-                  
-                  <div className="mt-2 text-xs">
-                    <div>Total words in vocabulary: {Object.keys(fullEmbedding).length}</div>
-                    <div>Words per emoji: {Math.round(vocabPercentage * Object.keys(fullEmbedding).length / 100)}</div>
-                  </div>
+
                 </div>
               )}
             </div>
