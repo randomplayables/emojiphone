@@ -14,18 +14,21 @@ const SESSION_CREATION_TIME_KEY = 'emojiphoneGameSessionCreationTime';
 
 
 /**
- * Extracts authentication data from the URL query parameters.
- * The platform will pass these parameters when launching the game.
+ * Extracts authentication and survey context data from the URL query parameters.
  */
-function getAuthFromURL() {
-  if (typeof window === 'undefined') return { token: null, userId: null, username: null };
+function getContextFromURL() {
+  if (typeof window === 'undefined') {
+    return { token: null, userId: null, username: null, surveyMode: false, questionId: null };
+  }
   
   const urlParams = new URLSearchParams(window.location.search);
   const authToken = urlParams.get('authToken');
   const userId = urlParams.get('userId');
   const username = urlParams.get('username');
+  const surveyMode = urlParams.get('surveyMode') === 'true';
+  const questionId = urlParams.get('questionId');
 
-  return { token: authToken, userId, username };
+  return { token: authToken, userId, username, surveyMode, questionId };
 }
 
 let sessionInitPromise: Promise<any> | null = null;
@@ -53,7 +56,7 @@ export async function initGameSession() {
       
       localStorage.removeItem(SESSION_STORAGE_KEY);
       
-      const { token, userId, username } = getAuthFromURL();
+      const { token, userId, username, surveyMode, questionId } = getContextFromURL();
       
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) {
@@ -65,8 +68,10 @@ export async function initGameSession() {
         headers,
         body: JSON.stringify({ 
           gameId: GAME_ID,
-          ...(userId && { passedUserId: userId }),
-          ...(username && { passedUsername: username })
+          passedUserId: userId,
+          passedUsername: username,
+          surveyMode: surveyMode,
+          surveyQuestionId: questionId
         }),
         credentials: 'include'
       });
@@ -82,11 +87,18 @@ export async function initGameSession() {
       const session = await response.json();
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
       localStorage.setItem(SESSION_CREATION_TIME_KEY, now.toString());
+
+      // If in survey mode, send the newly created session ID to the parent window
+      if (surveyMode && window.parent) {
+          console.log('Game is in survey mode. Posting session data to parent window.');
+          window.parent.postMessage({ type: 'GAME_SESSION_CREATED', payload: session }, '*');
+      }
+
       return session;
 
     } catch (error) {
       console.error('Error initializing game session:', error);
-      const { userId, username } = getAuthFromURL();
+      const { userId, username } = getContextFromURL();
       const localSession = { sessionId: `local-${Date.now()}`, userId, username, isGuest: !userId, gameId: GAME_ID };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(localSession));
       localStorage.setItem(SESSION_CREATION_TIME_KEY, Date.now().toString());
@@ -124,7 +136,7 @@ export async function saveGameData(eventName: string, eventData: any): Promise<a
       roundNumber = 0; // Default
   }
 
-  const { token, userId, username } = getAuthFromURL();
+  const { token, userId, username } = getContextFromURL();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -164,7 +176,7 @@ export async function saveGameData(eventName: string, eventData: any): Promise<a
  */
 export async function fetchPlatformEmbeddings(words: string[]): Promise<TEmbedding> {
   try {
-    const { token } = getAuthFromURL();
+    const { token } = getContextFromURL();
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
